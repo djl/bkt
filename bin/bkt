@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+"""
+Usage: bkt <command> [options]
+
+bkt handles file uploads to S3.
+
+Commands:
+  buckets        List all buckets
+  list           List all files in a bucket
+  delete         Delete a bucket or a file from a bucket
+  put            Upload a file to a bucket
+
+Options:
+  --help         Print this message and exit
+"""
+import ConfigParser
+import optparse
+import os
+import re
+import sys
+
+from boto.s3.connection import S3Connection
+from boto.s3.key import Key
+
+
+class Command(object):
+    def __init__(self):
+        self.authorize()
+        self.connect()
+
+        # add a parser
+        self.parser = optparse.OptionParser()
+        self.parser.remove_option('--help')
+        self.parser.add_option('-h', '--help',
+                               action='callback',
+                               callback=self.help)
+
+    def authorize(self):
+        bktfile = os.path.expanduser('~/.bkt')
+        if not os.path.exists(bktfile):
+            print >> sys.stderr, "Couldn't find your bkt file."
+            sys.exit(1)
+
+        config =  ConfigParser.ConfigParser()
+        config.readfp(open(bktfile))
+
+        self.access_key = config.get('auth', 'access_key')
+        self.secret_key = config.get('auth', 'secret_key')
+
+    def connect(self):
+        self.conn = S3Connection(self.access_key, self.secret_key)
+
+    def help(self, *args, **kwargs):
+        """
+        Prints the module's docstring and exits.
+        """
+        # wow, this doesn't feel right at all
+        doc = self.__doc__.strip()
+        print 'Usage: %s' % re.sub('    ', '', doc)
+        sys.exit()
+
+    def main(self):
+        self.options, self.args = self.parser.parse_args(sys.argv[2:])
+        self.run()
+
+
+class BucketsCommand(Command):
+    """
+    bkt buckets
+
+    List all the buckets in your S3 account.
+    """
+    name = 'buckets'
+
+    def run(self):
+        buckets = self.conn.get_all_buckets()
+        for b in buckets:
+            print b.name
+
+
+class DeleteCommand(Command):
+    """
+    bkt delete <bucket> <file>
+
+    Deletes a file from a bucket.
+    """
+    name = 'delete'
+
+    def run(self):
+        if len(self.args) != 2:
+            self.help()
+
+        bucket = self.conn.create_bucket(self.args[0])
+        bucket.delete_key(self.args[1])
+
+
+class LsCommand(Command):
+    """
+    bkt ls <bucket>
+
+    Lists all the files in a given bucket.
+    """
+    name = 'ls'
+
+    def run(self):
+        if len(self.args) != 1:
+            self.help()
+
+        bucket = self.conn.create_bucket(self.args[0])
+        for key in bucket.get_all_keys():
+            print key.name
+
+
+class PutCommand(Command):
+    """
+    bkt put <bucket> <file>
+
+    Uploads a new file to a bucket.
+    """
+    name = 'put'
+
+    def run(self):
+        if len(self.args) != 2:
+            self.help()
+
+        bucket = self.conn.create_bucket(self.args[0])
+        key = Key(bucket)
+        key.name = os.path.basename(self.args[1])
+        key.set_contents_from_filename(self.args[1])
+
+
+if __name__ == '__main__':
+    # no commands or arguments, print the help message
+    if len(sys.argv) <= 1 or sys.argv[1] in ('-h', '--help', 'help'):
+        print __doc__.strip()
+        sys.exit()
+
+    for c in Command.__subclasses__():
+        if c.name == sys.argv[1]:
+            command = c()
+            command.main()
+            sys.exit()
+
+    print "Unknown command '%s'." % sys.argv[1]
