@@ -71,6 +71,7 @@ class BucketsCommand(Command):
     List all the buckets in your S3 account.
     """
     name = 'buckets'
+    alias = ('list',)
 
     def run(self):
         buckets = self.conn.get_all_buckets()
@@ -136,7 +137,7 @@ if __name__ == '__main__':
         sys.exit()
 
     for c in Command.__subclasses__():
-        if c.name == sys.argv[1]:
+        if c.name == sys.argv[1] or hasattr(c, 'alias') and sys.argv[1] in c.alias:
             command = c()
             command.main()
             sys.exit()
