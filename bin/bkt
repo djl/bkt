@@ -17,6 +17,7 @@ import os
 import optparse
 import re
 import sys
+import textwrap
 
 from boto.exception import S3CreateError, S3ResponseError
 from boto.s3.connection import S3Connection
@@ -24,6 +25,9 @@ from boto.s3.key import Key
 
 
 class Command(object):
+
+    message_width = 79
+
     def __init__(self):
         self.authorize()
         self.connect()
@@ -51,16 +55,17 @@ class Command(object):
         self.conn = S3Connection(self.access_key, self.secret_key)
 
     def error(self, msg):
-        print >> sys.stderr, msg
+        print >> sys.stderr, '\n'.join(textwrap.wrap(msg, self.message_width))
         sys.exit(1)
 
     def help(self, *args, **kwargs):
         """
         Prints the module's docstring and exits.
         """
-        # wow, this doesn't feel right at all
-        doc = self.__doc__.strip()
-        print 'Usage: %s' % re.sub('    ', '', doc)
+        output = ""
+        for line in self.__doc__.strip().split("\n"):
+            output += "\n" + textwrap.dedent(line)
+        print 'Usage: %s' % output.strip()
         sys.exit()
 
     def main(self):
