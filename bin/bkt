@@ -14,8 +14,8 @@ Options:
   --help         Print this message and exit
 """
 import ConfigParser
-import optparse
 import os
+import optparse
 import re
 import sys
 
@@ -107,7 +107,7 @@ class LsCommand(Command):
             self.help()
 
         bucket = self.conn.create_bucket(self.args[0])
-        for key in bucket.get_all_keys():
+        for key in bucket.list():
             print key.name
 
 
