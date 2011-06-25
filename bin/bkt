@@ -6,8 +6,8 @@ bkt handles file uploads to S3.
 
 Commands:
   buckets        List all buckets
-  list           List all files in a bucket
-  delete         Delete a bucket or a file from a bucket
+  ls             List all files in a bucket
+  rm             Delete a bucket or a file from a bucket
   put            Upload a file to a bucket
 
 Options:
@@ -78,22 +78,6 @@ class BucketsCommand(Command):
             print b.name
 
 
-class DeleteCommand(Command):
-    """
-    bkt delete <bucket> <file>
-
-    Deletes a file from a bucket.
-    """
-    name = 'delete'
-
-    def run(self):
-        if len(self.args) != 2:
-            self.help()
-
-        bucket = self.conn.get_bucket(self.args[0])
-        bucket.delete_key(self.args[1])
-
-
 class LsCommand(Command):
     """
     bkt ls <bucket>
@@ -109,6 +93,22 @@ class LsCommand(Command):
         bucket = self.conn.get_bucket(self.args[0])
         for key in bucket.list():
             print key.name
+
+
+class RmCommand(Command):
+    """
+    bkt rm <bucket> <file>
+
+    Deletes a file from a bucket.
+    """
+    name = 'rm'
+
+    def run(self):
+        if len(self.args) != 2:
+            self.help()
+
+        bucket = self.conn.get_bucket(self.args[0])
+        bucket.delete_key(self.args[1])
 
 
 class PutCommand(Command):

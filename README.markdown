@@ -30,7 +30,7 @@ Upload a new file:
 
 Delete a file:
 
-    $ bkt delete home_backups some_file.txt
+    $ bkt rm home_backups some_file.txt
 
 
 
