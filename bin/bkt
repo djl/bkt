@@ -5,8 +5,7 @@ Usage: bkt <command> [options]
 bkt handles file uploads to S3.
 
 Commands:
-  buckets        List all buckets
-  ls             List all files in a bucket
+  ls             List all buckets or all files in a bucket
   rm             Delete a bucket or a file from a bucket
   put            Upload a file to a bucket
 
@@ -69,39 +68,30 @@ class Command(object):
         self.run()
 
 
-class BucketsCommand(Command):
-    """
-    bkt buckets
-
-    List all the buckets in your S3 account.
-    """
-    name = 'buckets'
-    alias = ('list',)
-
-    def run(self):
-        buckets = self.conn.get_all_buckets()
-        for b in buckets:
-            print b.name
-
-
 class LsCommand(Command):
     """
-    bkt ls <bucket>
+    bkt ls [<bucket>]
 
-    Lists all the files in a given bucket.
+    Lists all the buckets or all files in a given bucket.
     """
     name = 'ls'
 
     def run(self):
-        if len(self.args) != 1:
+        if len(self.args) not in (0, 1):
             self.help()
 
-        try:
-            bucket = self.conn.get_bucket(self.args[0])
-            for key in bucket.list():
-                print key.name
-        except S3ResponseError, e:
-            self.error(e.error_message)
+        # listing all buckets
+        if len(self.args) == 0:
+            buckets = self.conn.get_all_buckets()
+            for b in buckets:
+                print b.name
+        else:
+            try:
+                bucket = self.conn.get_bucket(self.args[0])
+                for key in bucket.list():
+                    print key.name
+            except S3ResponseError, e:
+                self.error(e.error_message)
 
 
 class RmCommand(Command):
