@@ -18,7 +18,7 @@ import optparse
 import re
 import sys
 
-from boto.exception import S3ResponseError
+from boto.exception import S3CreateError, S3ResponseError
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
@@ -66,6 +66,25 @@ class Command(object):
     def main(self):
         self.options, self.args = self.parser.parse_args(sys.argv[2:])
         self.run()
+
+
+class CreateCommand(Command):
+    """
+    bkt create <bucket>
+
+    Creates a new bucket.
+    """
+    name = 'create'
+    alias = ('mk',)
+
+    def run(self):
+        if len(self.args) != 1:
+            self.help()
+
+        try:
+            self.conn.create_bucket(self.args[0])
+        except S3CreateError, e:
+            self.error(e.error_message)
 
 
 class LsCommand(Command):
