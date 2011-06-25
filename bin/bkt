@@ -48,6 +48,9 @@ class Command(object):
         config =  ConfigParser.ConfigParser()
         config.readfp(open(bktfile))
 
+        if not config.has_section('auth'):
+            self.error('Missing [auth] section in your ~/.bkt file.')
+
         self.access_key = config.get('auth', 'access_key')
         self.secret_key = config.get('auth', 'secret_key')
 
