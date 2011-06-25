@@ -10,12 +10,17 @@ USAGE
 
 List all buckets:
 
-    bkt buckets
+    bkt ls
 
 
 List all files in a bucket:
 
-    bkt ls BUCKET_NAME
+    bkt ls BUCKET
+
+
+Create a new bucket:
+
+    bkt create
 
 
 Upload a new file:
@@ -25,8 +30,12 @@ Upload a new file:
 
 Delete a file:
 
-    $ bkt rm BUCKET_NAME file.tar.gz
+    $ bkt rm BUCKET file.tar.gz
 
+
+Delete a bucket:
+
+    $ bkt rm BUCKET
 
 
 SETUP
@@ -51,7 +60,6 @@ REQUIREMENTS
 TODO
 ----
 
-* (Explicit) creation and deletion of buckets
 * Set/modify permissions for whole buckets or individual files
+* Choose which region to create a bucket in
 * Documentation
-* Deletes
