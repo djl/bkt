@@ -20,12 +20,12 @@ List all files in a bucket:
 
 Create a new bucket:
 
-    bkt create
+    bkt create BUCKET
 
 
 Upload a new file:
 
-    bkt put BUCKET_NAME /path/to/some/file.tar.gz
+    bkt put BUCKET /path/to/some/file.tar.gz
 
 
 Delete a file:
