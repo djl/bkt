@@ -96,18 +96,24 @@ class LsCommand(Command):
 
 class RmCommand(Command):
     """
-    bkt rm <bucket> <file>
+    bkt rm <bucket> [<file>]
 
-    Deletes a file from a bucket.
+    Deletes a bucket or a file from a bucket.
     """
     name = 'rm'
 
     def run(self):
-        if len(self.args) != 2:
+        if len(self.args) not in (1, 2):
             self.help()
 
-        bucket = self.conn.get_bucket(self.args[0])
-        bucket.delete_key(self.args[1])
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+            if len(self.args) == 1:
+                self.conn.delete_bucket(bucket)
+            else:
+                bucket.delete_key(self.args[1])
+        except S3ResponseError, e:
+            self.error(e.error_message)
 
 
 class PutCommand(Command):
