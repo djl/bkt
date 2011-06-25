@@ -24,6 +24,13 @@ from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 
 
+def sizeof(num):
+    for x in ['bytes','KB','MB','GB','TB']:
+        if num < 1024.0:
+            return "%3.1f%s" % (num, x)
+        num /= 1024.0
+
+
 class Command(object):
 
     # max width of help/error messages
@@ -119,11 +126,19 @@ class CreateCommand(Command):
 
 class LsCommand(Command):
     """
-    bkt ls [<bucket>]
+    bkt ls [options] [<bucket>]
 
     Lists all the buckets or all files in a given bucket.
+
+    Options:
+      -v, --verbose          Display more information about each bucket
     """
     name = 'ls'
+
+    def __init__(self):
+        super(LsCommand, self).__init__()
+        self.parser.add_option('-a', '-v', '--verbose',
+                               action='store_true', dest='verbose')
 
     def run(self):
         if len(self.args) not in (0, 1):
@@ -133,12 +148,18 @@ class LsCommand(Command):
         if len(self.args) == 0:
             buckets = self.conn.get_all_buckets()
             for b in buckets:
-                print b.name
+                if not self.options.verbose:
+                    print b.name
+                else:
+                    print '%s %s' % (b.name, b.get_location() or "DEFAULT")
         else:
             try:
                 bucket = self.conn.get_bucket(self.args[0])
                 for key in bucket.list():
-                    print key.name
+                    if not self.options.verbose:
+                        print key.name
+                    else:
+                        print '%s %s' % (key.name, sizeof(key.size))
             except S3ResponseError, e:
                 self.error(e.error_message)
 
