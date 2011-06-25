@@ -20,13 +20,17 @@ import sys
 import textwrap
 
 from boto.exception import S3CreateError, S3ResponseError
-from boto.s3.connection import S3Connection
+from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 
 
 class Command(object):
 
+    # max width of help/error messages
     message_width = 79
+
+    # location where buckets should be created
+    location = Location.DEFAULT
 
     def __init__(self):
         self.authorize()
@@ -45,14 +49,22 @@ class Command(object):
             print >> sys.stderr, "Couldn't find your bkt file."
             sys.exit(1)
 
-        config =  ConfigParser.ConfigParser()
+        config = ConfigParser.ConfigParser()
         config.readfp(open(bktfile))
 
+        # auth
         if not config.has_section('auth'):
             self.error('Missing [auth] section in your ~/.bkt file.')
 
         self.access_key = config.get('auth', 'access_key')
         self.secret_key = config.get('auth', 'secret_key')
+
+        # locations
+        if config.has_option('buckets', 'location'):
+            location = config.get('buckets', 'location')
+            if not hasattr(Location, location):
+                self.error("Unknown location '%s' " % location)
+            self.location = getattr(Location, location)
 
     def connect(self):
         self.conn = S3Connection(self.access_key, self.secret_key)
@@ -78,20 +90,30 @@ class Command(object):
 
 class CreateCommand(Command):
     """
-    bkt create <bucket>
+    bkt create [options] <bucket>
 
     Creates a new bucket.
+
+    Options:
+        -l, --location LOC       The location in which to create the bucket
     """
     name = 'create'
     alias = ('mk',)
+
+    def __init__(self):
+        super(CreateCommand, self).__init__()
+
+        # custom --location option
+        self.parser.add_option('-l', '--location', dest='location',
+                               default=self.location)
 
     def run(self):
         if len(self.args) != 1:
             self.help()
 
         try:
-            self.conn.create_bucket(self.args[0])
-        except S3CreateError, e:
+            self.conn.create_bucket(self.args[0], location=self.options.location)
+        except (S3CreateError, S3ResponseError), e:
             self.error(e.error_message)
 
 

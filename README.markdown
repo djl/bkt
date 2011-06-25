@@ -62,5 +62,4 @@ TODO
 
 * Progress bar for uploads
 * Set/modify permissions for whole buckets or individual files
-* Choose which region to create a bucket in
 * Documentation
