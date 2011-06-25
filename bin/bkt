@@ -90,7 +90,7 @@ class DeleteCommand(Command):
         if len(self.args) != 2:
             self.help()
 
-        bucket = self.conn.create_bucket(self.args[0])
+        bucket = self.conn.get_bucket(self.args[0])
         bucket.delete_key(self.args[1])
 
 
@@ -106,7 +106,7 @@ class LsCommand(Command):
         if len(self.args) != 1:
             self.help()
 
-        bucket = self.conn.create_bucket(self.args[0])
+        bucket = self.conn.get_bucket(self.args[0])
         for key in bucket.list():
             print key.name
 
@@ -123,7 +123,7 @@ class PutCommand(Command):
         if len(self.args) != 2:
             self.help()
 
-        bucket = self.conn.create_bucket(self.args[0])
+        bucket = self.conn.get_bucket(self.args[0])
         key = Key(bucket)
         key.name = os.path.basename(self.args[1])
         key.set_contents_from_filename(self.args[1])
