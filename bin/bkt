@@ -19,6 +19,7 @@ import optparse
 import re
 import sys
 
+from boto.exception import S3ResponseError
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
@@ -49,6 +50,10 @@ class Command(object):
 
     def connect(self):
         self.conn = S3Connection(self.access_key, self.secret_key)
+
+    def error(self, msg):
+        print >> sys.stderr, msg
+        sys.exit(1)
 
     def help(self, *args, **kwargs):
         """
@@ -91,9 +96,12 @@ class LsCommand(Command):
         if len(self.args) != 1:
             self.help()
 
-        bucket = self.conn.get_bucket(self.args[0])
-        for key in bucket.list():
-            print key.name
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+            for key in bucket.list():
+                print key.name
+        except S3ResponseError, e:
+            self.error(e.error_message)
 
 
 class RmCommand(Command):
@@ -124,10 +132,13 @@ class PutCommand(Command):
         if len(self.args) != 2:
             self.help()
 
-        bucket = self.conn.get_bucket(self.args[0])
-        key = Key(bucket)
-        key.name = os.path.basename(self.args[1])
-        key.set_contents_from_filename(self.args[1])
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+            key = Key(bucket)
+            key.name = os.path.basename(self.args[1])
+            key.set_contents_from_filename(self.args[1])
+        except S3ResponseError, e:
+            self.error(e.error_message)
 
 
 if __name__ == '__main__':
