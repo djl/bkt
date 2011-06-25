@@ -10,27 +10,22 @@ USAGE
 
 List all buckets:
 
-    $ bkt buckets
-    home_backups
-    project_backups
-    work_backups
+    bkt buckets
 
 
 List all files in a bucket:
 
-    $ bkt ls home_backups
-    documents-20110410.tar.gz.gpg
-    ...
+    bkt ls BUCKET_NAME
 
 
 Upload a new file:
 
-    $ bkt put home_backups some_file.txt
+    bkt put BUCKET_NAME /path/to/some/file.tar.gz
 
 
 Delete a file:
 
-    $ bkt rm home_backups some_file.txt
+    $ bkt rm BUCKET_NAME file.tar.gz
 
 
 
