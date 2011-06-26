@@ -60,7 +60,6 @@ REQUIREMENTS
 TODO
 ----
 
-* Tidy up help/error messages (unindent)
 * Progress bar for uploads
 * Set/modify permissions for whole buckets or individual files
 * Documentation

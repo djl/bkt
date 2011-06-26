@@ -62,7 +62,6 @@ class Command(object):
         # auth
         if not config.has_section('auth'):
             self.error('Missing [auth] section in your ~/.bkt file.')
-
         self.access_key = config.get('auth', 'access_key')
         self.secret_key = config.get('auth', 'secret_key')
 
@@ -86,7 +85,7 @@ class Command(object):
         """
         output = ""
         for line in self.__doc__.strip().split("\n"):
-            output += "\n" + textwrap.dedent(line)
+            output += re.sub('^\s{4}', '', line) + "\n"
         print 'Usage: %s' % output.strip()
         sys.exit()
 
