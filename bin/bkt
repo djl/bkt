@@ -32,48 +32,51 @@ def sizeof(num):
 
 
 class Command(object):
-
-    # max width of help/error messages
     message_width = 79
-
-    # location where buckets should be created
     location = Location.DEFAULT
 
     def __init__(self):
-        self.authorize()
-        self.connect()
+        self.setup_config()
+        self.setup_auth()
+        self.setup_connection()
+        self.setup_location()
+        self.setup_parser()
 
-        # add a parser
+    def setup_auth(self):
+        # auth
+        try:
+            self.access_key = self.config.get('auth', 'access_key')
+            self.secret_key = self.config.get('auth', 'secret_key')
+        except ConfigParser.Error:
+            self.error("Couldn't find any credentials in your ~/.bkt file.")
+
+    def setup_config(self):
+        self.config = ConfigParser.ConfigParser()
+        self.config_file = os.path.expanduser('~/.bkt')
+
+        try:
+            self.config.readfp(open(self.config_file))
+        except IOError:
+            self.error("Couldn't read your ~/.bkt file.")
+
+    def setup_connection(self):
+        self.conn = S3Connection(self.access_key, self.secret_key)
+
+    def setup_location(self):
+        try:
+            location = self.config.get('buckets', 'location')
+            if not hasattr(Location, location):
+                self.error("Unknown location '%s' " % location)
+            self.location = getattr(Location, location)
+        except ConfigParser.Error:
+            self.location = Location.DEFAULT
+
+    def setup_parser(self):
         self.parser = optparse.OptionParser()
         self.parser.remove_option('--help')
         self.parser.add_option('-h', '--help',
                                action='callback',
                                callback=self.help)
-
-    def authorize(self):
-        bktfile = os.path.expanduser('~/.bkt')
-        if not os.path.exists(bktfile):
-            print >> sys.stderr, "Couldn't find your bkt file."
-            sys.exit(1)
-
-        config = ConfigParser.ConfigParser()
-        config.readfp(open(bktfile))
-
-        # auth
-        if not config.has_section('auth'):
-            self.error('Missing [auth] section in your ~/.bkt file.')
-        self.access_key = config.get('auth', 'access_key')
-        self.secret_key = config.get('auth', 'secret_key')
-
-        # locations
-        if config.has_option('buckets', 'location'):
-            location = config.get('buckets', 'location')
-            if not hasattr(Location, location):
-                self.error("Unknown location '%s' " % location)
-            self.location = getattr(Location, location)
-
-    def connect(self):
-        self.conn = S3Connection(self.access_key, self.secret_key)
 
     def error(self, msg):
         print >> sys.stderr, '\n'.join(textwrap.wrap(msg, self.message_width))
