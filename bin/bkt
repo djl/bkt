@@ -136,6 +136,7 @@ class LsCommand(Command):
       -v, --verbose          Display more information about each bucket
     """
     name = 'ls'
+    alias = ('list',)
 
     def __init__(self):
         super(LsCommand, self).__init__()
