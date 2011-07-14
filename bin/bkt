@@ -127,6 +127,35 @@ class CreateCommand(Command):
             self.error(e.error_message)
 
 
+class GetCommand(Command):
+    """
+    bkt get <bucket> <file>
+
+    Get a file from a bucket.
+    """
+    name = 'get'
+
+    def run(self):
+        if len(self.args) not in (2, 3):
+            self.help()
+
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+        except S3ResponseError, e:
+            self.error(e.error_message)
+
+        key = bucket.get_key(self.args[1])
+        if not key:
+            self.error("The specified file does not exist in this bucket")
+
+        try:
+            fn = os.path.join(os.getcwd(), self.args[1])
+            fh = open(fn, 'w')
+            key.get_file(fh)
+        except IOError:
+            self.error("Could not write to local file '%s'" % fn)
+
+
 class LsCommand(Command):
     """
     bkt ls [options] [<bucket>]

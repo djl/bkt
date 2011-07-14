@@ -28,6 +28,11 @@ Upload a new file:
     bkt put BUCKET /path/to/some/file.tar.gz
 
 
+Download a file to the current directory:
+
+    bkt get BUCKET file.tar.gz
+
+
 Delete a file:
 
     $ bkt rm BUCKET file.tar.gz
