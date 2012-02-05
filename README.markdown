@@ -59,12 +59,12 @@ REQUIREMENTS
 ------------
 
 * [boto](http://boto.cloudhackers.com/)
+* [progressbar](http://pypi.python.org/pypi/progressbar/)
 
 
 
 TODO
 ----
 
-* Progress bar for uploads
 * Set/modify permissions for whole buckets or individual files
 * Documentation

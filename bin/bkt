@@ -25,6 +25,8 @@ from boto.exception import S3CreateError, S3ResponseError
 from boto.s3.connection import Location, S3Connection
 from boto.s3.key import Key
 
+import progressbar
+
 
 def sizeof(num):
     for x in ['bytes','KB','MB','GB','TB']:
@@ -98,6 +100,21 @@ class Command(object):
         self.options, self.args = self.parser.parse_args(sys.argv[2:])
         self.run()
 
+    def start_progressbar(self, filename, size):
+        widgets = [
+            filename, ' ', progressbar.Bar(), ' ',
+            progressbar.FileTransferSpeed(), ' | ', progressbar.Percentage(),
+            ' ',  progressbar.ETA()
+        ]
+        self.progressbar = progressbar.ProgressBar(widgets=widgets, maxval=size)
+        self.progressbar.start()
+
+    def finish_progressbar(self):
+        self.progressbar.finish()
+
+    def progress(self, current, total):
+        self.progressbar.update(current)
+
 
 class CreateCommand(Command):
     """
@@ -150,9 +167,11 @@ class GetCommand(Command):
             self.error("The specified file does not exist in this bucket")
 
         try:
+            self.start_progressbar(self.args[1], key.size)
             fn = os.path.join(os.getcwd(), self.args[1])
             fh = open(fn, 'w')
-            key.get_file(fh)
+            key.get_file(fh, cb=self.progress, num_cb=100)
+            self.finish_progressbar()
         except IOError:
             self.error("Could not write to local file '%s'" % fn)
 
@@ -233,10 +252,13 @@ class PutCommand(Command):
             self.help()
 
         try:
+            size = os.stat(self.args[1]).st_size
+            self.start_progressbar(self.args[1], size)
             bucket = self.conn.get_bucket(self.args[0])
             key = Key(bucket)
             key.name = os.path.basename(self.args[1])
-            key.set_contents_from_filename(self.args[1])
+            key.set_contents_from_filename(self.args[1], cb=self.progress, num_cb=100)
+            self.finish_progressbar()
         except S3ResponseError, e:
             self.error(e.error_message)
 
