@@ -86,12 +86,12 @@ class Command(object):
 
     def help(self, *args, **kwargs):
         """
-        Prints the module's docstring and exits.
+        Prints the help message to stderr.
         """
         output = ""
         for line in self.__doc__.strip().split("\n"):
             output += re.sub('^\s{4}', '', line) + "\n"
-        print 'Usage: %s' % output.strip()
+        print >> sys.stderr, 'Usage: %s' % output.strip()
         sys.exit()
 
     def main(self):
@@ -244,7 +244,7 @@ class PutCommand(Command):
 if __name__ == '__main__':
     # no commands or arguments, print the help message
     if len(sys.argv) <= 1 or sys.argv[1] in ('-h', '--help', 'help'):
-        print __doc__.strip()
+        print >> sys.stderr, __doc__.strip()
         sys.exit()
 
     for c in Command.__subclasses__():
