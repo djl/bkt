@@ -212,7 +212,9 @@ class LsCommand(Command):
                     if not self.options.verbose:
                         print key.name
                     else:
-                        print '%s %s' % (key.name, sizeof(key.size))
+                        print key.name
+                        print ' %s' % sizeof(key.size)
+                        print ' %s' % ', '.join([x.permission for x in key.get_acl().acl.grants])
             except S3ResponseError, e:
                 self.error(e.error_message)
 
