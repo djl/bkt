@@ -18,6 +18,7 @@ import ConfigParser
 import os
 import optparse
 import re
+import subprocess
 import sys
 import textwrap
 
@@ -47,12 +48,22 @@ class Command(object):
         self.setup_parser()
 
     def setup_auth(self):
-        # auth
-        try:
-            self.access_key = self.config.get('auth', 'access_key')
-            self.secret_key = self.config.get('auth', 'secret_key')
-        except ConfigParser.Error:
-            self.error("Couldn't find any credentials in your ~/.bkt file.")
+        self.access_key = None
+        self.secret_key = None
+
+        for option in ['access_key', 'secret_key']:
+            # try to get the regular
+            if self.config.has_option('auth', option):
+                value = self.config.get('auth', option)
+                setattr(self, option, value)
+
+            # try to get the `_eval` option
+            if self.config.has_option('auth', option + '_eval'):
+                value = self.eval_option(self.config.get('auth', option + '_eval'))
+                setattr(self, option, value)
+
+            if not getattr(self, option, None):
+                self.error("Couldn't read option '%s' in your ~/.bkt file." % option)
 
     def setup_config(self):
         self.config = ConfigParser.ConfigParser()
@@ -81,6 +92,10 @@ class Command(object):
         self.parser.add_option('-h', '--help',
                                action='callback',
                                callback=self.help)
+
+    def eval_option(self, cmd):
+        proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+        return proc.communicate()[0].strip()
 
     def error(self, msg):
         print >> sys.stderr, '\n'.join(textwrap.wrap(msg, self.message_width))

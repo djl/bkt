@@ -54,6 +54,17 @@ keys in an `auth` section:
     secret_key = LOLSECRETS
 
 
+If you want to keep your credentials somewhere else, you can use the
+special `_eval` options to call another command. For example, to use
+GNOME Keyring you might do something like this:
+
+
+    [auth]
+    access_key_eval = gnome-keyring-query get aws_access_key
+    secret_key_eval = gnome-keyring-query get aws_secret_key
+
+
+
 
 REQUIREMENTS
 ------------
