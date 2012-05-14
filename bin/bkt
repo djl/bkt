@@ -52,7 +52,7 @@ class Command(object):
         self.secret_key = None
 
         for option in ['access_key', 'secret_key']:
-            # try to get the regular
+            # try to get the regular options
             if self.config.has_option('auth', option):
                 value = self.config.get('auth', option)
                 setattr(self, option, value)
@@ -62,7 +62,7 @@ class Command(object):
                 value = self.eval_option(self.config.get('auth', option + '_eval'))
                 setattr(self, option, value)
 
-            if not getattr(self, option, None):
+            if getattr(self, option, None) is None:
                 self.error("Couldn't read option '%s' in your ~/.bkt file." % option)
 
     def setup_config(self):
