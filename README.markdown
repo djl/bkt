@@ -70,12 +70,4 @@ REQUIREMENTS
 ------------
 
 * [boto](http://boto.cloudhackers.com/)
-* [progressbar](http://pypi.python.org/pypi/progressbar/)
-
-
-
-TODO
-----
-
-* Set/modify permissions for whole buckets or individual files
-* Documentation
+* [progressbar](http://pypi.python.org/pypi/progressbar/) (optional, but pretty)
