@@ -74,7 +74,7 @@ class Command(object):
                 self.error("Couldn't read option '%s' in your ~/.bkt file." % option)
 
     def setup_config(self):
-        self.config = ConfigParser.ConfigParser()
+        self.config = configparser.ConfigParser()
         self.config_file = os.path.expanduser('~/.bkt')
 
         try:
@@ -91,7 +91,7 @@ class Command(object):
             if not hasattr(Location, location):
                 self.error("Unknown location '%s' " % location)
             self.location = getattr(Location, location)
-        except ConfigParser.Error:
+        except configparser.Error:
             self.location = Location.DEFAULT
 
     def setup_parser(self):
