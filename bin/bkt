@@ -14,13 +14,17 @@ Commands:
 Options:
   -h, --help     Print this message and exit
 """
-import ConfigParser
 import os
 import optparse
 import re
 import subprocess
 import sys
 import textwrap
+
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 from boto.exception import S3CreateError, S3ResponseError
 from boto.s3.connection import Location, S3Connection
@@ -102,7 +106,8 @@ class Command(object):
         return proc.communicate()[0].strip()
 
     def error(self, msg):
-        print >> sys.stderr, '\n'.join(textwrap.wrap(msg, self.message_width))
+        msg = '\n'.join(textwrap.wrap(msg, self.message_width))
+        sys.stderr.write(msg + '\n')
         sys.exit(1)
 
     def help(self, *args, **kwargs):
@@ -112,7 +117,7 @@ class Command(object):
         output = ""
         for line in self.__doc__.strip().split("\n"):
             output += re.sub('^\s{4}', '', line) + "\n"
-        print >> sys.stderr, 'Usage: %s' % output.strip()
+        sys.stderr.write('Usage: %s\n' % output.strip())
         sys.exit()
 
     def main(self):
@@ -164,7 +169,7 @@ class CreateCommand(Command):
 
         try:
             self.conn.create_bucket(self.args[0], location=self.options.location)
-        except (S3CreateError, S3ResponseError), e:
+        except (S3CreateError, S3ResponseError) as e:
             self.error(e.error_message)
 
 
@@ -182,7 +187,7 @@ class GetCommand(Command):
 
         try:
             bucket = self.conn.get_bucket(self.args[0])
-        except S3ResponseError, e:
+        except S3ResponseError as e:
             self.error(e.error_message)
 
         key = bucket.get_key(self.args[1])
@@ -225,20 +230,20 @@ class LsCommand(Command):
             buckets = self.conn.get_all_buckets()
             for b in buckets:
                 if not self.options.verbose:
-                    print b.name
+                    sys.stdout.write(b.name + '\n')
                 else:
-                    print '%s %s' % (b.name, b.get_location() or "DEFAULT")
+                    sys.stdout.write('%s %s\n' % (b.name, b.get_location() or "DEFAULT"))
         else:
             try:
                 bucket = self.conn.get_bucket(self.args[0])
                 for key in bucket.list():
                     if not self.options.verbose:
-                        print key.name
+                        sys.stdout.write(key.name)
                     else:
-                        print key.name
-                        print ' %s' % sizeof(key.size)
-                        print ' %s' % ', '.join([x.permission for x in key.get_acl().acl.grants])
-            except S3ResponseError, e:
+                        sys.stdout.write(key.name)
+                        sys.stdout.write(' %s' % sizeof(key.size))
+                        sys.stdout.write(' %s' % ', '.join([x.permission for x in key.get_acl().acl.grants]))
+            except S3ResponseError as e:
                 self.error(e.error_message)
 
 
@@ -260,7 +265,7 @@ class RmCommand(Command):
                 self.conn.delete_bucket(bucket)
             else:
                 bucket.delete_key(self.args[1])
-        except S3ResponseError, e:
+        except S3ResponseError as e:
             self.error(e.error_message)
 
 
@@ -284,14 +289,14 @@ class PutCommand(Command):
             self.start_progressbar(self.args[1], size)
             key.set_contents_from_filename(self.args[1], cb=self.progress, num_cb=100)
             self.finish_progressbar()
-        except S3ResponseError, e:
+        except S3ResponseError as e:
             self.error(e.error_message)
 
 
 if __name__ == '__main__':
     # no commands or arguments, print the help message
     if len(sys.argv) <= 1 or sys.argv[1] in ('-h', '--help', 'help'):
-        print >> sys.stderr, __doc__.strip()
+        sys.stderr.write(__doc__.lstrip())
         sys.exit()
 
     for c in Command.__subclasses__():
@@ -300,5 +305,5 @@ if __name__ == '__main__':
             command.main()
             sys.exit()
 
-    print >> sys.stderr, "Unknown command '%s'." % sys.argv[1]
+    sys.stderr.write("Unknown command '%s'.\n" % sys.argv[1])
     sys.exit(1)
