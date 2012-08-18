@@ -209,9 +209,6 @@ class LsCommand(Command):
     bkt ls [options] [<bucket>]
 
     Lists all the buckets or all files in a given bucket.
-
-    Options:
-      -v, --verbose          Display more information about each bucket
     """
     name = 'ls'
     alias = ('list',)
@@ -228,10 +225,7 @@ class LsCommand(Command):
         if len(self.args) == 0:
             buckets = self.conn.get_all_buckets()
             for b in buckets:
-                if not self.options.verbose:
-                    sys.stdout.write(b.name + '\n')
-                else:
-                    sys.stdout.write('%s %s\n' % (b.name, b.get_location() or "DEFAULT"))
+                sys.stdout.write(b.name + '\n')
         else:
             try:
                 bucket = self.conn.get_bucket(self.args[0])
