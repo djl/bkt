@@ -218,8 +218,7 @@ class LsCommand(Command):
 
     def __init__(self):
         super(LsCommand, self).__init__()
-        self.parser.add_option('-a', '-v', '--verbose',
-                               action='store_true', dest='verbose')
+
 
     def run(self):
         if len(self.args) not in (0, 1):
@@ -237,12 +236,7 @@ class LsCommand(Command):
             try:
                 bucket = self.conn.get_bucket(self.args[0])
                 for key in bucket.list():
-                    if not self.options.verbose:
-                        sys.stdout.write(key.name)
-                    else:
-                        sys.stdout.write(key.name)
-                        sys.stdout.write(' %s' % sizeof(key.size))
-                        sys.stdout.write(' %s' % ', '.join([x.permission for x in key.get_acl().acl.grants]))
+                    sys.stdout.write(key.name + '\n')
             except S3ResponseError as e:
                 self.error(e.error_message)
 
