@@ -10,27 +10,27 @@ USAGE
 
 List all buckets:
 
-    bkt ls
+    $ bkt ls
 
 
 List all files in a bucket:
 
-    bkt ls BUCKET
+    $ bkt ls BUCKET
 
 
 Create a new bucket:
 
-    bkt create BUCKET
+    $ bkt create BUCKET
 
 
 Upload a new file:
 
-    bkt put BUCKET /path/to/some/file.tar.gz
+    $ bkt put BUCKET /path/to/some/file.tar.gz
 
 
 Download a file to the current directory:
 
-    bkt get BUCKET file.tar.gz
+    $ bkt get BUCKET file.tar.gz
 
 
 Delete a file:
