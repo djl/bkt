@@ -146,7 +146,7 @@ class Command(object):
 
 class CreateCommand(Command):
     """
-    bkt create [options] <bucket>
+    bkt create [options] <bucket> [...]
 
     Creates a new bucket.
 
@@ -164,25 +164,26 @@ class CreateCommand(Command):
                                default=self.location)
 
     def run(self):
-        if len(self.args) != 1:
+        if len(self.args) < 1:
             self.help()
 
-        try:
-            self.conn.create_bucket(self.args[0], location=self.options.location)
-        except (S3CreateError, S3ResponseError) as e:
-            self.error(e.error_message)
+        for bucket in self.args:
+            try:
+                self.conn.create_bucket(bucket, location=self.options.location)
+            except (S3CreateError, S3ResponseError) as e:
+                self.error(e.error_message)
 
 
 class GetCommand(Command):
     """
-    bkt get <bucket> <file>
+    bkt get <bucket> <file> [...]
 
-    Get a file from a bucket.
+    Get files from a bucket.
     """
     name = 'get'
 
     def run(self):
-        if len(self.args) not in (2, 3):
+        if len(self.args) < 3:
             self.help()
 
         try:
@@ -190,25 +191,26 @@ class GetCommand(Command):
         except S3ResponseError as e:
             self.error(e.error_message)
 
-        key = bucket.get_key(self.args[1])
-        if not key:
-            self.error("The specified file does not exist in this bucket")
+        for fn in self.args[1:]:
+            key = bucket.get_key(fn)
+            if not key:
+                self.error("The specified file does not exist in this bucket")
 
-        try:
-            self.start_progressbar(self.args[1], key.size)
-            fn = os.path.join(os.getcwd(), self.args[1])
-            fh = open(fn, 'w')
-            key.get_file(fh, cb=self.progress, num_cb=100)
-            self.finish_progressbar()
-        except IOError:
-            self.error("Could not write to local file '%s'" % fn)
+            try:
+                self.start_progressbar(fn, key.size)
+                fn = os.path.join(os.getcwd(), fn)
+                fh = open(fn, 'w')
+                key.get_file(fh, cb=self.progress, num_cb=100)
+                self.finish_progressbar()
+            except IOError:
+                self.error("Could not write to local file '%s'" % fn)
 
 
 class LsCommand(Command):
     """
-    bkt ls [options] [<bucket>]
+    bkt ls [<bucket>]
 
-    Lists all the buckets or all files in a given bucket.
+    Lists all buckets or all files in a given bucket.
     """
     name = 'ls'
     alias = ('list',)
@@ -237,46 +239,50 @@ class LsCommand(Command):
 
 class RmCommand(Command):
     """
-    bkt rm <bucket> [<file>]
+    bkt rm <bucket> [<file> ...]
 
     Deletes a bucket or a file from a bucket.
     """
     name = 'rm'
 
     def run(self):
-        if len(self.args) not in (1, 2):
+        if len(self.args) < 1:
             self.help()
 
+        bucket = self.args[0]
+
         try:
-            bucket = self.conn.get_bucket(self.args[0])
+            bucket = self.conn.get_bucket(bucket)
             if len(self.args) == 1:
                 self.conn.delete_bucket(bucket)
             else:
-                bucket.delete_key(self.args[1])
+                for fn in self.args[1:]:
+                    bucket.delete_key(fn)
         except S3ResponseError as e:
             self.error(e.error_message)
 
 
 class PutCommand(Command):
     """
-    bkt put <bucket> <file>
+    bkt put <bucket> <file> [...]
 
     Uploads a new file to a bucket.
     """
     name = 'put'
 
     def run(self):
-        if len(self.args) != 2:
+        if len(self.args) < 2:
             self.help()
 
         try:
-            size = os.stat(self.args[1]).st_size
             bucket = self.conn.get_bucket(self.args[0])
-            key = Key(bucket)
-            key.name = os.path.basename(self.args[1])
-            self.start_progressbar(self.args[1], size)
-            key.set_contents_from_filename(self.args[1], cb=self.progress, num_cb=100)
-            self.finish_progressbar()
+            for fn in self.args[1:]:
+                size = os.stat(fn).st_size
+                key = Key(bucket)
+                key.name = os.path.basename(fn)
+                self.start_progressbar(fn, size)
+                key.set_contents_from_filename(fn, cb=self.progress, num_cb=100)
+                self.finish_progressbar()
         except S3ResponseError as e:
             self.error(e.error_message)
 
