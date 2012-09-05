@@ -183,7 +183,7 @@ class GetCommand(Command):
     name = 'get'
 
     def run(self):
-        if len(self.args) < 3:
+        if len(self.args) < 2:
             self.help()
 
         try:
