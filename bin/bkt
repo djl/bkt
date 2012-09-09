@@ -10,6 +10,7 @@ Commands:
   mk             Create a new bucket
   put            Upload a file to a bucket
   cp             Copy files between buckets
+  mv             Move files between buckets
   rm             Delete a bucket or a file from a bucket
 
 Options:
@@ -310,7 +311,39 @@ class CopyCommand(Command):
         try:
             bucket = self.conn.get_bucket(src)
             key = bucket.get_key(filename)
+            if not key:
+                self.error('Unknown file "%s"' % filename)
             key.copy(dest, newname)
+        except S3ResponseError as e:
+            self.error(e.error_message)
+
+
+class MoveCommand(Command):
+    """
+    bkt mv <src> <filename> <dest> [<newfilename>]
+
+    Move a file to another bucket.
+    """
+    name = 'mv'
+    alias = ('move',)
+
+    def run(self):
+        if len(self.args) < 3:
+            self.help()
+
+        src, filename, dest = self.args[0:3]
+        if len(self.args) == 4:
+            newname = self.args[3]
+        else:
+            newname = filename
+
+        try:
+            bucket = self.conn.get_bucket(src)
+            key = bucket.get_key(filename)
+            if not key:
+                self.error('Unknown file "%s"' % filename)
+            key.copy(dest, newname)
+            key.delete()
         except S3ResponseError as e:
             self.error(e.error_message)
 

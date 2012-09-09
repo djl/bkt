@@ -51,6 +51,14 @@ Copy a file between buckets
     # copy to a new file name
     $ bkt cp OLDBUCKET file.tar.gz NEWBUCKET newfile.tar.gz
 
+Move a file between buckets
+
+    # move between buckets while keeping the original name
+    $ bkt mv OLDBUCKET file.tar.gz NEWBUCKET
+
+    # move to a new file name
+    $ bkt mv OLDBUCKET file.tar.gz NEWBUCKET newfile.tar.gz
+
 
 SETUP
 -----
