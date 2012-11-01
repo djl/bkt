@@ -114,7 +114,7 @@ class Command(object):
         self.run()
 
     def progress(self, cur, total):
-        sys.stderr.write('\r\x1b[K' + str(cur * 100 / total) + '%')
+        sys.stderr.write(str(cur * 100 / total) + "%\r")
         sys.stderr.flush()
 
 
@@ -174,7 +174,6 @@ class GetCommand(Command):
                 fn = os.path.join(os.getcwd(), fn)
                 fh = open(fn, 'w')
                 key.get_file(fh, cb=self.progress)
-                sys.stderr.write('\n')
             except IOError:
                 self.error("Could not write to local file '%s'" % fn)
 
@@ -254,9 +253,6 @@ class PutCommand(Command):
                 key = Key(bucket)
                 key.name = os.path.basename(fn)
                 key.set_contents_from_filename(fn, cb=self.progress, num_cb=100)
-                sys.stderr.flush()
-                sys.stderr.write('\n')
-                sys.stderr.flush()
         except S3ResponseError as e:
             self.error(e.error_message)
 
