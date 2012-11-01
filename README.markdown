@@ -87,4 +87,3 @@ REQUIREMENTS
 ------------
 
 * [boto](http://boto.cloudhackers.com/)
-* [progressbar](http://pypi.python.org/pypi/progressbar/) (optional, but pretty)
