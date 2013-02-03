@@ -9,19 +9,12 @@ Commands:
   get            Download a file from a bucket
   mk             Create a new bucket
   put            Upload a file to a bucket
-  cp             Copy files between buckets
-  mv             Move files between buckets
   rm             Delete a bucket or a file from a bucket
-
-Options:
-  -h, --help     Print this message and exit
 """
-import optparse
 import os
 import re
 import subprocess
 import sys
-import textwrap
 
 try:
     import configparser
@@ -29,20 +22,20 @@ except ImportError:
     import ConfigParser as configparser
 
 from boto.exception import S3CreateError, S3ResponseError
-from boto.s3.connection import Location, S3Connection
+from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
 
 class Command(object):
-    message_width = 79
-    location = Location.DEFAULT
+
+    CONFIG_FILE = '~/.bkt'
 
     def __init__(self):
         self.setup_config()
         self.setup_auth()
-        self.setup_connection()
-        self.setup_location()
-        self.setup_parser()
+
+        self.args = sys.argv[2:]
+        self.conn = S3Connection(self.access_key, self.secret_key)
 
     def setup_auth(self):
         self.access_key = None
@@ -56,48 +49,27 @@ class Command(object):
 
             # try to get the `_eval` option
             if self.config.has_option('auth', option + '_eval'):
-                value = self.eval_option(self.config.get('auth', option + '_eval'))
+                opt_eval = self.config.get('auth', option + '_eval')
+                value = self.eval_option(opt_eval)
                 setattr(self, option, value)
 
             if getattr(self, option, None) is None:
-                self.error("Couldn't read option '%s' in your ~/.bkt file." % option)
+                self.error("Missing config option '%s'." % option)
 
     def setup_config(self):
-        self.config = configparser.ConfigParser()
-        self.config_file = os.path.expanduser('~/.bkt')
-
         try:
-            self.config.readfp(open(self.config_file))
+            self.config = configparser.ConfigParser()
+            self.config.readfp(open(os.path.expanduser(self.CONFIG_FILE)))
         except IOError:
-            self.error("Couldn't read your ~/.bkt file.")
-
-    def setup_connection(self):
-        self.conn = S3Connection(self.access_key, self.secret_key)
-
-    def setup_location(self):
-        try:
-            location = self.config.get('buckets', 'location')
-            if not hasattr(Location, location):
-                self.error("Unknown location '%s' " % location)
-            self.location = getattr(Location, location)
-        except configparser.Error:
-            self.location = Location.DEFAULT
-
-    def setup_parser(self):
-        self.parser = optparse.OptionParser()
-        self.parser.remove_option('--help')
-        self.parser.add_option('-h', '--help',
-                               action='callback',
-                               callback=self.help)
+            self.error("Couldn't read your config file.")
 
     def eval_option(self, cmd):
         proc = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         return proc.communicate()[0].strip()
 
-    def error(self, msg):
-        msg = '\n'.join(textwrap.wrap(msg, self.message_width))
-        sys.stderr.write(msg + '\n')
-        sys.exit(1)
+    def error(self, msg, error=1):
+        sys.stderr.write('bkt: %s\n' % msg)
+        sys.exit(error)
 
     def help(self, *args, **kwargs):
         """
@@ -109,33 +81,22 @@ class Command(object):
         sys.stderr.write('Usage: %s\n' % output.strip())
         sys.exit()
 
-    def main(self):
-        self.options, self.args = self.parser.parse_args(sys.argv[2:])
-        self.run()
-
-    def progress(self, cur, total):
+    def pbar(self, cur, total):
+        """
+        A very simple progress bar.
+        """
         sys.stderr.write(str(cur * 100 / total) + "%\r")
         sys.stderr.flush()
 
 
 class CreateCommand(Command):
     """
-    bkt create [options] <bucket> [...]
+    bkt create <bucket> [...]
 
     Creates a new bucket.
-
-    Options:
-        -l, --location LOC       The location in which to create the bucket
     """
     name = 'create'
     alias = ('mk',)
-
-    def __init__(self):
-        super(CreateCommand, self).__init__()
-
-        # custom --location option
-        self.parser.add_option('-l', '--location', dest='location',
-                               default=self.location)
 
     def run(self):
         if len(self.args) < 1:
@@ -174,7 +135,7 @@ class GetCommand(Command):
             try:
                 fn = os.path.join(os.getcwd(), fn)
                 fh = open(fn, 'w')
-                key.get_file(fh, cb=self.progress)
+                key.get_file(fh, cb=self.pbar)
             except IOError:
                 self.error("Could not write to local file '%s'" % fn)
 
@@ -187,10 +148,6 @@ class LsCommand(Command):
     """
     name = 'ls'
     alias = ('list',)
-
-    def __init__(self):
-        super(LsCommand, self).__init__()
-
 
     def run(self):
         if len(self.args) not in (0, 1):
@@ -223,12 +180,10 @@ class RmCommand(Command):
         if len(self.args) < 1:
             self.help()
 
-        bucket = self.args[0]
-
         try:
-            bucket = self.conn.get_bucket(bucket)
+            bucket = self.conn.get_bucket(self.args[0])
             if len(self.args) == 1:
-                self.conn.delete_bucket(bucket)
+                self.conn.delete_bucket(self.args[0])
             else:
                 for fn in self.args[1:]:
                     bucket.delete_key(fn)
@@ -252,72 +207,11 @@ class PutCommand(Command):
         try:
             bucket = self.conn.get_bucket(self.args[0])
             for fn in self.args[1:]:
-                size = os.stat(fn).st_size
                 key = Key(bucket)
                 key.name = os.path.basename(fn)
-                key.set_contents_from_filename(fn, cb=self.progress, num_cb=100)
+                key.set_contents_from_filename(fn, cb=self.pbar, num_cb=100)
         except S3ResponseError as e:
             self.error(e.error_message)
-
-
-class CopyCommand(Command):
-    """
-    bkt cp <src> <filename> <dest> [<newfilename>]
-
-    Copy a file to another bucket.
-    """
-    name = 'cp'
-    alias = ('copy',)
-
-    def run(self):
-        if len(self.args) < 3:
-            self.help()
-
-        src, filename, dest = self.args[0:3]
-        if len(self.args) == 4:
-            newname = self.args[3]
-        else:
-            newname = filename
-
-        try:
-            bucket = self.conn.get_bucket(src)
-            key = bucket.get_key(filename)
-            if not key:
-                self.error('Unknown file "%s"' % filename)
-            key.copy(dest, newname)
-        except S3ResponseError as e:
-            self.error(e.error_message)
-
-
-class MoveCommand(Command):
-    """
-    bkt mv <src> <filename> <dest> [<newfilename>]
-
-    Move a file to another bucket.
-    """
-    name = 'mv'
-    alias = ('move',)
-
-    def run(self):
-        if len(self.args) < 3:
-            self.help()
-
-        src, filename, dest = self.args[0:3]
-        if len(self.args) == 4:
-            newname = self.args[3]
-        else:
-            newname = filename
-
-        try:
-            bucket = self.conn.get_bucket(src)
-            key = bucket.get_key(filename)
-            if not key:
-                self.error('Unknown file "%s"' % filename)
-            key.copy(dest, newname)
-            key.delete()
-        except S3ResponseError as e:
-            self.error(e.error_message)
-
 
 
 if __name__ == '__main__':
@@ -329,7 +223,7 @@ if __name__ == '__main__':
     for c in Command.__subclasses__():
         if c.name == sys.argv[1] or sys.argv[1] in c.alias:
             command = c()
-            command.main()
+            command.run()
             sys.exit()
 
     sys.stderr.write("Unknown command '%s'.\n" % sys.argv[1])
