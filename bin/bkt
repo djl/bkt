@@ -11,6 +11,7 @@ Commands:
   put            Upload a file to a bucket
   rm             Delete a bucket or a file from a bucket
 """
+import fnmatch
 import os
 import subprocess
 import sys
@@ -146,8 +147,10 @@ class RmCommand(Command):
             if len(self.args) == 1:
                 self.conn.delete_bucket(self.args[0])
             else:
+                keys = dict([(key.name, key) for key in bucket.list()])
                 for fn in self.args[1:]:
-                    bucket.delete_key(fn)
+                    for key in fnmatch.filter(keys.keys(), fn):
+                        bucket.delete_key(keys[key])
         except S3ResponseError as e:
             self.error(e.error_message)
 
