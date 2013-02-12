@@ -164,7 +164,7 @@ class MkCommand(Command):
 
         for bucket in self.args:
             try:
-                self.conn.create_bucket(bucket, location=self.options.location)
+                self.conn.create_bucket(bucket)
             except (S3CreateError, S3ResponseError) as e:
                 self.error(e.error_message)
 
