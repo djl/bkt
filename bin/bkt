@@ -11,6 +11,7 @@ Commands:
   put            Upload a file to a bucket
   rm             Delete a bucket or a file from a bucket
 """
+import mimetypes
 import os
 import subprocess
 import sys
@@ -70,6 +71,7 @@ class Command(object):
 
     CONFIG_FILE = '~/.bkt'
     BUFFER_SIZE = 1024 * 1024
+    CONTENT_TYPE = 'application/octet-stream'
 
     def __init__(self):
         self.setup_config()
@@ -135,6 +137,10 @@ class Command(object):
         if dresp and 'Errors' in dresp.keys():
             raise S3Error(dresp['Errors'][0]['Message'])
         return dresp
+
+    def content_type(self, fn):
+        ext = os.path.splitext(fn)[-1]
+        return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
 
 class GetCommand(Command):
@@ -238,8 +244,9 @@ class PutCommand(Command):
         try:
             for fn in self.args[1:]:
                 key = os.path.basename(fn)
+                ct = self.content_type(fn)
                 body = FileIterator(fn, self.BUFFER_SIZE, self.progress)
-                self.op('PutObject', bucket=self.args[0], key=key, body=body)
+                self.op('PutObject', bucket=self.args[0], key=key, body=body, content_type=ct)
         except OSError as e:
             self.error("Couldn't read file: %s" % fn)
         except S3Error as e:
