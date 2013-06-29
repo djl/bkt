@@ -76,13 +76,8 @@ class Command(object):
     def __init__(self):
         self.setup_config()
         self.setup_auth()
-
+        self.setup_service()
         self.args = sys.argv[2:]
-
-        self.session = botocore.session.get_session()
-        self.session.set_credentials(self.access_key, self.secret_key)
-        self.service = self.session.get_service('s3')
-        self.endpoint = self.service.get_endpoint()
 
     def setup_auth(self):
         self.access_key = None
@@ -97,7 +92,7 @@ class Command(object):
             # try to get the `_eval` option
             if self.config.has_option('auth', option + '_eval'):
                 opt_eval = self.config.get('auth', option + '_eval')
-                value = self.eval_option(opt_eval).decode('utf-8')
+                value = self.eval(opt_eval).decode('utf-8')
                 setattr(self, option, value)
 
             if getattr(self, option, None) is None:
@@ -110,7 +105,17 @@ class Command(object):
         except IOError:
             self.error("Couldn't read your config file.")
 
-    def eval_option(self, cmd):
+    def setup_service(self):
+        self.session = botocore.session.get_session()
+        self.session.set_credentials(self.access_key, self.secret_key)
+        self.service = self.session.get_service('s3')
+        self.endpoint = self.service.get_endpoint()
+
+    def error(self, msg, error=1):
+        sys.stderr.write('bkt: %s\n' % msg)
+        sys.exit(error)
+
+    def eval(self, cmd):
         try:
             from subprocess import PIPE
             from subprocess import DEVNULL
@@ -119,13 +124,13 @@ class Command(object):
         proc = subprocess.Popen(cmd.split(), stdout=PIPE, stderr=DEVNULL)
         return proc.communicate()[0].strip()
 
-    def error(self, msg, error=1):
-        sys.stderr.write('bkt: %s\n' % msg)
-        sys.exit(error)
-
     def help(self, *args, **kwargs):
         sys.stderr.write('%s\n' % self.__doc__.strip())
         sys.exit()
+
+    def content_type(self, fn):
+        ext = os.path.splitext(fn)[-1]
+        return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
     def progress(self, cur, total):
         sys.stderr.write(str(cur * 100 / total) + '%\r')
@@ -137,10 +142,6 @@ class Command(object):
         if dresp and 'Errors' in dresp.keys():
             raise S3Error(dresp['Errors'][0]['Message'])
         return dresp
-
-    def content_type(self, fn):
-        ext = os.path.splitext(fn)[-1]
-        return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
 
 class GetCommand(Command):
@@ -178,9 +179,6 @@ class LsCommand(Command):
     name = 'ls'
 
     def run(self):
-        if len(self.args) not in (0, 1):
-            self.help()
-
         # listing all buckets
         if len(self.args) == 0:
             for bucket in self.op('ListBuckets')['Buckets']:
