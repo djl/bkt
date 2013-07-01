@@ -40,8 +40,8 @@ class FileIterable(object):
                     sys.stderr.write("\n")
                     break
                 self.readsofar += len(data)
-                self.callback(self.readsofar, self.totalsize)
                 yield data
+                self.callback(self.readsofar, self.totalsize, self.filename)
 
     def __len__(self):
         return self.totalsize
@@ -70,7 +70,7 @@ class S3Error(Exception):
 class Command(object):
 
     CONFIG_FILE = '~/.bkt'
-    BUFFER_SIZE = 1024 * 1024
+    BUFFER_SIZE = 1024 * 1024 * 10
     CONTENT_TYPE = 'application/octet-stream'
 
     def __init__(self):
@@ -132,9 +132,18 @@ class Command(object):
         ext = os.path.splitext(fn)[-1]
         return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
-    def progress(self, cur, total):
-        sys.stderr.write('\r%s%%' % str(cur * 100 / total))
+    def progress(self, cur, total, fn):
+        if cur >= total:
+            finished = True
+            cur = total
+        else:
+            finished = False
+
+        sys.stderr.write('\x1b[?25l\r%s: %s%%' % (fn, str(cur * 100 / total)))
         sys.stderr.flush()
+
+        if finished:
+            sys.stderr.write('\x1b[?25h\n')
 
     def op(self, operation, *args, **kwargs):
         op = self.service.get_operation(operation)
@@ -165,7 +174,7 @@ class GetCommand(Command):
                         fh.write(buffer)
                         cur += self.BUFFER_SIZE
                         buffer = resp['Body'].read(self.BUFFER_SIZE)
-                        self.progress(cur, total)
+                        self.progress(cur, total, fn)
         except IOError:
             self.error("Could not write to local file '%s'" % fn)
         except S3Error as e:
