@@ -133,7 +133,7 @@ class Command(object):
         return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
     def progress(self, cur, total):
-        sys.stderr.write(str(cur * 100 / total) + '%\r')
+        sys.stderr.write('\r%s%%' % str(cur * 100 / total))
         sys.stderr.flush()
 
     def op(self, operation, *args, **kwargs):
