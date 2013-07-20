@@ -24,6 +24,10 @@ except ImportError:
 import botocore.session
 
 
+HIDE_CURSOR = '\x1b[?25l'
+SHOW_CURSOR = '\x1b[?25h'
+
+
 class FileIterable(object):
     def __init__(self, filename, chunksize, callback):
         self.filename = filename
@@ -139,11 +143,11 @@ class Command(object):
         else:
             finished = False
 
-        sys.stderr.write('\x1b[?25l\r%s: %s%%' % (fn, str(cur * 100 / total)))
+        sys.stderr.write('%s\r%s: %s%%' % (HIDE_CURSOR, fn, str(cur * 100 / total)))
         sys.stderr.flush()
 
         if finished:
-            sys.stderr.write('\x1b[?25h\n')
+            sys.stderr.write('%s\n' % SHOW_CURSOR)
 
     def op(self, operation, *args, **kwargs):
         op = self.service.get_operation(operation)
@@ -260,7 +264,7 @@ class PutCommand(Command):
             self.error(e)
 
 
-if __name__ == '__main__':
+def main():
     # no commands or arguments, print the help message
     if len(sys.argv) <= 1 or sys.argv[1] in ('-h', '--help', 'help'):
         sys.stderr.write(__doc__.lstrip())
@@ -275,3 +279,11 @@ if __name__ == '__main__':
     # unknown command
     sys.stderr.write(__doc__.lstrip())
     sys.exit(1)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.stderr.write('\nAborting...%s\n' % SHOW_CURSOR)
+        sys.exit(2)
