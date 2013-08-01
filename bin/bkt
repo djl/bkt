@@ -41,7 +41,6 @@ class FileIterable(object):
             while True:
                 data = file.read(self.chunksize)
                 if not data:
-                    sys.stderr.write("\n")
                     break
                 self.readsofar += len(data)
                 yield data
