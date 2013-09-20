@@ -69,4 +69,4 @@ GNOME Keyring you might do something like this:
 REQUIREMENTS
 ------------
 
-* [botocore](https://pypi.python.org/pypi/botocore)
+* [boto](https://pypi.python.org/pypi/boto)

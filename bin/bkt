@@ -21,53 +21,13 @@ try:
 except ImportError:
     import ConfigParser as configparser
 
-import botocore.session
+from boto.exception import S3CreateError, S3ResponseError
+from boto.s3.connection import S3Connection
+from boto.s3.key import Key
 
 
 HIDE_CURSOR = '\x1b[?25l'
 SHOW_CURSOR = '\x1b[?25h'
-
-
-class FileIterable(object):
-    def __init__(self, filename, chunksize, callback):
-        self.filename = filename
-        self.chunksize = chunksize
-        self.callback = callback
-        self.totalsize = os.path.getsize(filename)
-        self.readsofar = 0
-
-    def __iter__(self):
-        with open(self.filename, 'rb') as file:
-            while True:
-                data = file.read(self.chunksize)
-                if not data:
-                    break
-                self.readsofar += len(data)
-                yield data
-                self.callback(self.readsofar, self.totalsize, self.filename)
-
-    def __len__(self):
-        return self.totalsize
-
-    def read(self, size=-1):
-        return next(self, b'')
-
-
-class FileIterator(object):
-    def __init__(self, fn, chunksize, callback=None):
-        iterable = FileIterable(fn, chunksize, callback)
-        self.iterator = iter(iterable)
-        self.length = len(iterable)
-
-    def read(self, size=-1):
-        return next(self.iterator, b'')
-
-    def __len__(self):
-        return self.length
-
-
-class S3Error(Exception):
-    pass
 
 
 class Command(object):
@@ -79,7 +39,7 @@ class Command(object):
     def __init__(self):
         self.setup_config()
         self.setup_auth()
-        self.setup_service()
+        self.setup_connection()
         self.args = sys.argv[2:]
 
     def setup_auth(self):
@@ -108,11 +68,8 @@ class Command(object):
         except IOError:
             self.error("Couldn't read your config file.")
 
-    def setup_service(self):
-        self.session = botocore.session.get_session()
-        self.session.set_credentials(self.access_key, self.secret_key)
-        self.service = self.session.get_service('s3')
-        self.endpoint = self.service.get_endpoint()
+    def setup_connection(self):
+        self.conn = S3Connection(self.access_key, self.secret_key)
 
     def error(self, msg, error=1):
         sys.stderr.write('bkt: %s\n' % msg)
@@ -135,25 +92,18 @@ class Command(object):
         ext = os.path.splitext(fn)[-1]
         return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
 
-    def progress(self, cur, total, fn):
+    def progress(self, cur, total):
         if cur >= total:
             finished = True
             cur = total
         else:
             finished = False
 
-        sys.stderr.write('%s\r%s: %s%%' % (HIDE_CURSOR, fn, str(cur * 100 / total)))
+        sys.stderr.write('%s\r%s: %s%%' % (HIDE_CURSOR, self._fn, str(cur * 100 / total)))
         sys.stderr.flush()
 
         if finished:
             sys.stderr.write('%s\n' % SHOW_CURSOR)
-
-    def op(self, operation, *args, **kwargs):
-        op = self.service.get_operation(operation)
-        hresp, dresp = op.call(self.endpoint, *args, **kwargs)
-        if dresp and 'Errors' in dresp.keys():
-            raise S3Error(dresp['Errors'][0]['Message'])
-        return dresp
 
 
 class GetCommand(Command):
@@ -167,21 +117,22 @@ class GetCommand(Command):
             self.help()
 
         try:
-            for fn in self.args[1:]:
-                resp = self.op('GetObject', bucket=self.args[0], key=fn)
-                with open(fn, 'wb') as fh:
-                    cur = 0
-                    total = int(resp['ContentLength'])
-                    buffer = resp['Body'].read(self.BUFFER_SIZE)
-                    while buffer:
-                        fh.write(buffer)
-                        cur += self.BUFFER_SIZE
-                        buffer = resp['Body'].read(self.BUFFER_SIZE)
-                        self.progress(cur, total, fn)
-        except IOError:
-            self.error("Could not write to local file '%s'" % fn)
-        except S3Error as e:
-            self.error(e)
+            bucket = self.conn.get_bucket(self.args[0])
+        except S3ResponseError as e:
+            self.error(e.error_message)
+
+        for fn in self.args[1:]:
+            key = bucket.get_key(fn)
+            if not key:
+                self.error('The specified file does not exist in this bucket.')
+
+            try:
+                self._fn = fn
+                fh = open(os.path.join(os.getcwd(), fn), 'w')
+                key.get_file(fh, cb=self.progress)
+                self._fn = None
+            except IOError:
+                self.error("Could not write to local file '%s'" % fn)
 
 
 class LsCommand(Command):
@@ -193,15 +144,16 @@ class LsCommand(Command):
     def run(self):
         # listing all buckets
         if len(self.args) == 0:
-            for bucket in self.op('ListBuckets')['Buckets']:
-                sys.stdout.write(bucket['Name'] + '\n')
+            buckets = self.conn.get_all_buckets()
+            for b in buckets:
+                sys.stdout.write(b.name + '\n')
         else:
             try:
-                resp = self.op('ListObjects', bucket=self.args[0])
-                for obj in resp['Contents']:
-                    sys.stdout.write(obj['Key'] + '\n')
-            except S3Error as e:
-                self.error(e)
+                bucket = self.conn.get_bucket(self.args[0])
+                for key in bucket.list():
+                    sys.stdout.write(key.name + '\n')
+            except S3ResponseError as e:
+                self.error(e.error_message)
 
 
 class RmCommand(Command):
@@ -215,13 +167,14 @@ class RmCommand(Command):
             self.help()
 
         try:
+            bucket = self.conn.get_bucket(self.args[0])
             if len(self.args) == 1:
-                self.op('DeleteBucket', bucket=self.args[0])
+                self.conn.delete_bucket(self.args[0])
             else:
                 for fn in self.args[1:]:
-                    self.op('DeleteObject', bucket=self.args[0], key=fn)
-        except S3Error as e:
-            self.error(e)
+                    bucket.delete_key(fn)
+        except S3ResponseError as e:
+            self.error(e.error_message)
 
 
 class MkCommand(Command):
@@ -236,9 +189,9 @@ class MkCommand(Command):
 
         for bucket in self.args:
             try:
-                self.op('CreateBucket', bucket=self.args[0])
-            except S3Error as e:
-                self.error(e)
+                self.conn.create_bucket(bucket)
+            except (S3CreateError, S3ResponseError) as e:
+                self.error(e.error_message)
 
 
 class PutCommand(Command):
@@ -252,15 +205,15 @@ class PutCommand(Command):
             self.help()
 
         try:
+            bucket = self.conn.get_bucket(self.args[0])
             for fn in self.args[1:]:
-                key = os.path.basename(fn)
-                ct = self.content_type(fn)
-                body = FileIterator(fn, self.BUFFER_SIZE, self.progress)
-                self.op('PutObject', bucket=self.args[0], key=key, body=body, content_type=ct)
-        except OSError as e:
-            self.error("Couldn't read file: %s" % fn)
-        except S3Error as e:
-            self.error(e)
+                self._fn = os.path.basename(fn)
+                key = Key(bucket)
+                key.name = os.path.basename(fn)
+                key.set_contents_from_filename(fn, cb=self.progress, num_cb=100)
+                self._fn = None
+        except S3ResponseError as e:
+            self.error(e.error_message)
 
 
 def main():
