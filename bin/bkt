@@ -33,8 +33,6 @@ SHOW_CURSOR = '\x1b[?25h'
 class Command(object):
 
     CONFIG_FILE = '~/.bkt'
-    BUFFER_SIZE = 1024 * 1024 * 10
-    CONTENT_TYPE = 'application/octet-stream'
 
     def __init__(self):
         self.setup_config()
@@ -88,10 +86,6 @@ class Command(object):
         sys.stderr.write('%s\n' % self.__doc__.strip())
         sys.exit()
 
-    def content_type(self, fn):
-        ext = os.path.splitext(fn)[-1]
-        return mimetypes.types_map.get(ext, self.CONTENT_TYPE)
-
     def progress(self, cur, total):
         if cur >= total:
             finished = True
@@ -144,8 +138,7 @@ class LsCommand(Command):
     def run(self):
         # listing all buckets
         if len(self.args) == 0:
-            buckets = self.conn.get_all_buckets()
-            for b in buckets:
+            for b in self.conn.get_all_buckets():
                 sys.stdout.write(b.name + '\n')
         else:
             try:
