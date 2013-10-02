@@ -20,7 +20,7 @@ List all files in a bucket:
 
 Create a new bucket:
 
-    $ bkt create BUCKET
+    $ bkt mk BUCKET
 
 
 Upload a new file:
