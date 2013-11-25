@@ -13,6 +13,7 @@ Commands:
   rm             Delete a bucket or a file from a bucket
 """
 import os
+import shlex
 import subprocess
 import sys
 
@@ -74,12 +75,9 @@ class Command(object):
         sys.exit(error)
 
     def eval(self, cmd):
-        try:
-            from subprocess import PIPE
-            from subprocess import DEVNULL
-        except ImportError:
-            DEVNULL = open(os.devnull, 'wb')
-        proc = subprocess.Popen(cmd.split(), stdout=PIPE, stderr=DEVNULL)
+        cmd = shlex.split(cmd)
+        devnull = open(os.devnull, 'wb')
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=devnull)
         return proc.communicate()[0].strip()
 
     def get_local_filename(self, fn):
