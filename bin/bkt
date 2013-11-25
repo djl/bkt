@@ -12,7 +12,6 @@ Commands:
   put            Upload a file to a bucket
   rm             Delete a bucket or a file from a bucket
 """
-import mimetypes
 import os
 import subprocess
 import sys
@@ -89,12 +88,10 @@ class Command(object):
         while True:
             if count:
                 new_fn = '%s.%d' % (fn, count)
-
             if os.path.exists(new_fn):
                 count += 1
                 continue
             return new_fn
-
 
     def help(self, *args, **kwargs):
         sys.stderr.write('%s\n' % self.__doc__.strip())
