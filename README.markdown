@@ -33,6 +33,11 @@ Download a file to the current directory:
     $ bkt get BUCKET file.tar.gz
 
 
+Download all files to the current directory:
+
+    $ bkt grab BUCKET file.tar.gz
+
+
 Delete a file:
 
     $ bkt rm BUCKET file.tar.gz

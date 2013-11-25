@@ -7,6 +7,7 @@ bkt handles file uploads to S3.
 Commands:
   ls             List all buckets or all files in a bucket
   get            Download a file from a bucket
+  grab           Download all files from a bucket
   mk             Create a new bucket
   put            Upload a file to a bucket
   rm             Delete a bucket or a file from a bucket
@@ -82,6 +83,19 @@ class Command(object):
         proc = subprocess.Popen(cmd.split(), stdout=PIPE, stderr=DEVNULL)
         return proc.communicate()[0].strip()
 
+    def get_local_filename(self, fn):
+        count = 0
+        new_fn = fn
+        while True:
+            if count:
+                new_fn = '%s.%d' % (fn, count)
+
+            if os.path.exists(new_fn):
+                count += 1
+                continue
+            return new_fn
+
+
     def help(self, *args, **kwargs):
         sys.stderr.write('%s\n' % self.__doc__.strip())
         sys.exit()
@@ -121,7 +135,34 @@ class GetCommand(Command):
                 self.error('The specified file does not exist in this bucket.')
 
             try:
-                self._fn = fn
+                self._fn = key.name
+                fn = self.get_local_filename(key.name)
+                fh = open(os.path.join(os.getcwd(), fn), 'w')
+                key.get_file(fh, cb=self.progress)
+                self._fn = None
+            except IOError:
+                self.error("Could not write to local file '%s'" % fn)
+
+
+class GrabCommand(Command):
+    """
+    Usage: bkt grab <bucket>
+    """
+    name = 'grab'
+
+    def run(self):
+        if len(self.args) != 1:
+            self.help()
+
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+        except S3ResponseError as e:
+            self.error(e.error_message)
+
+        for key in bucket.list():
+            try:
+                self._fn = key.name
+                fn = self.get_local_filename(key.name)
                 fh = open(os.path.join(os.getcwd(), fn), 'w')
                 key.get_file(fh, cb=self.progress)
                 self._fn = None
