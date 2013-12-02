@@ -43,6 +43,11 @@ Delete a file:
     $ bkt rm BUCKET file.tar.gz
 
 
+Delete all files in a bucket:
+
+    $ bkt empty BUCKET
+
+
 Delete a bucket:
 
     $ bkt rm BUCKET

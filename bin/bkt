@@ -8,6 +8,7 @@ Commands:
   ls             List all buckets or all files in a bucket
   get            Download a file from a bucket
   grab           Download all files from a bucket
+  empty          Delete all files in a bucket
   mk             Create a new bucket
   put            Upload a file to a bucket
   rm             Delete a bucket or a file from a bucket
@@ -137,6 +138,23 @@ class GetCommand(Command):
                 self._fn = None
             except IOError:
                 self.error("Could not write to local file '%s'" % fn)
+
+
+class EmptyCommand(Command):
+    """
+    Usage: bkt empty <bucket>
+    """
+    name = 'empty'
+
+    def run(self):
+        if len(self.args) < 1:
+            self.help()
+
+        try:
+            bucket = self.conn.get_bucket(self.args[0])
+            bucket.delete_keys([x.name for x in bucket.list()])
+        except S3ResponseError as e:
+            self.error(e.error_message)
 
 
 class GrabCommand(Command):
