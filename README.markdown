@@ -35,7 +35,8 @@ Download a file to the current directory:
 
 Download all files to the current directory:
 
-    $ bkt grab BUCKET file.tar.gz
+    # uses globbing
+    $ bkt get BUCKET "*"
 
 
 Delete a file:
@@ -43,14 +44,15 @@ Delete a file:
     $ bkt rm BUCKET file.tar.gz
 
 
-Delete all files in a bucket:
-
-    $ bkt empty BUCKET
-
-
-Delete a bucket:
+Delete a bucket (must be empty):
 
     $ bkt rm BUCKET
+
+
+Delete a bucket and its contents:
+
+    $ bkt rm -r BUCKET
+
 
 
 SETUP

@@ -7,12 +7,11 @@ bkt handles file uploads to S3.
 Commands:
   ls             List all buckets or all files in a bucket
   get            Download a file from a bucket
-  grab           Download all files from a bucket
-  empty          Delete all files in a bucket
   mk             Create a new bucket
   put            Upload a file to a bucket
-  rm             Delete a bucket or a file from a bucket
+  rm             Delete a bucket or files from a bucket
 """
+import fnmatch
 import os
 import shlex
 import subprocess
@@ -41,6 +40,47 @@ class Command(object):
         self.setup_auth()
         self.setup_connection()
         self.args = sys.argv[2:]
+
+    def error(self, msg, error=1):
+        sys.stderr.write('bkt: %s%s\n' % (msg, SHOW_CURSOR))
+        sys.exit(error)
+
+    def eval(self, cmd):
+        cmd = shlex.split(cmd)
+        devnull = open(os.devnull, 'wb')
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=devnull)
+        return proc.communicate()[0].strip()
+
+    def get_local_filename(self, fn):
+        count = 0
+        new_fn = fn
+        while True:
+            if count:
+                new_fn = '%s.%d' % (fn, count)
+            if os.path.exists(new_fn):
+                count += 1
+                continue
+            return new_fn
+
+    def help(self, *args, **kwargs):
+        sys.stderr.write('%s\n' % self.__doc__.strip())
+        sys.exit()
+
+    def parse_args(self):
+        self.options, self.args = self.parser.parse_args(sys.argv[2:])
+
+    def progress(self, cur, total):
+        if cur >= total:
+            finished = True
+            cur = total
+        else:
+            finished = False
+
+        sys.stderr.write('%s\r%s: %s%%' % (HIDE_CURSOR, self._fn, str(cur * 100 / total)))
+        sys.stderr.flush()
+
+        if finished:
+            sys.stderr.write('%s\n' % SHOW_CURSOR)
 
     def setup_auth(self):
         self.access_key = None
@@ -71,44 +111,6 @@ class Command(object):
     def setup_connection(self):
         self.conn = S3Connection(self.access_key, self.secret_key)
 
-    def error(self, msg, error=1):
-        sys.stderr.write('bkt: %s\n' % msg)
-        sys.exit(error)
-
-    def eval(self, cmd):
-        cmd = shlex.split(cmd)
-        devnull = open(os.devnull, 'wb')
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=devnull)
-        return proc.communicate()[0].strip()
-
-    def get_local_filename(self, fn):
-        count = 0
-        new_fn = fn
-        while True:
-            if count:
-                new_fn = '%s.%d' % (fn, count)
-            if os.path.exists(new_fn):
-                count += 1
-                continue
-            return new_fn
-
-    def help(self, *args, **kwargs):
-        sys.stderr.write('%s\n' % self.__doc__.strip())
-        sys.exit()
-
-    def progress(self, cur, total):
-        if cur >= total:
-            finished = True
-            cur = total
-        else:
-            finished = False
-
-        sys.stderr.write('%s\r%s: %s%%' % (HIDE_CURSOR, self._fn, str(cur * 100 / total)))
-        sys.stderr.flush()
-
-        if finished:
-            sys.stderr.write('%s\n' % SHOW_CURSOR)
-
 
 class GetCommand(Command):
     """
@@ -117,70 +119,27 @@ class GetCommand(Command):
     name = 'get'
 
     def run(self):
-        if len(self.args) < 2:
-            self.help()
-
-        try:
-            bucket = self.conn.get_bucket(self.args[0])
-        except S3ResponseError as e:
-            self.error(e.error_message)
-
-        for fn in self.args[1:]:
-            key = bucket.get_key(fn)
-            if not key:
-                self.error('The specified file does not exist in this bucket.')
-
-            try:
-                self._fn = key.name
-                fn = self.get_local_filename(key.name)
-                fh = open(os.path.join(os.getcwd(), fn), 'w')
-                key.get_file(fh, cb=self.progress)
-                self._fn = None
-            except IOError:
-                self.error("Could not write to local file '%s'" % fn)
-
-
-class EmptyCommand(Command):
-    """
-    Usage: bkt empty <bucket>
-    """
-    name = 'empty'
-
-    def run(self):
         if len(self.args) < 1:
             self.help()
 
         try:
             bucket = self.conn.get_bucket(self.args[0])
-            bucket.delete_keys([x.name for x in bucket.list()])
         except S3ResponseError as e:
             self.error(e.error_message)
 
+        keys = dict([(key.name, key) for key in bucket.list()])
 
-class GrabCommand(Command):
-    """
-    Usage: bkt grab <bucket>
-    """
-    name = 'grab'
-
-    def run(self):
-        if len(self.args) != 1:
-            self.help()
-
-        try:
-            bucket = self.conn.get_bucket(self.args[0])
-        except S3ResponseError as e:
-            self.error(e.error_message)
-
-        for key in bucket.list():
-            try:
-                self._fn = key.name
-                fn = self.get_local_filename(key.name)
-                fh = open(os.path.join(os.getcwd(), fn), 'w')
-                key.get_file(fh, cb=self.progress)
-                self._fn = None
-            except IOError:
-                self.error("Could not write to local file '%s'" % fn)
+        for fn in self.args[1:]:
+            for name in fnmatch.filter(keys.keys(), fn):
+                try:
+                    key = keys[name]
+                    self._fn = name
+                    fn = self.get_local_filename(name)
+                    fh = open(os.path.join(os.getcwd(), fn), 'w')
+                    key.get_file(fh, cb=self.progress)
+                    self._fn = None
+                except IOError:
+                    self.error("Could not write to local file '%s'" % fn)
 
 
 class LsCommand(Command):
@@ -205,23 +164,39 @@ class LsCommand(Command):
 
 class RmCommand(Command):
     """
-    Usage: bkt rm <bucket> [<file> ...]
+    Usage: bkt rm [-r] <bucket> [<file>, ...]
     """
     name = 'rm'
 
     def run(self):
+        if self.args[0] in ['-r', '--recurse']:
+            recurse = True
+            del self.args[0]
+        else:
+            recurse = False
+
         if len(self.args) < 1:
             self.help()
 
-        try:
-            bucket = self.conn.get_bucket(self.args[0])
-            if len(self.args) == 1:
-                self.conn.delete_bucket(self.args[0])
-            else:
-                for fn in self.args[1:]:
-                    bucket.delete_key(fn)
-        except S3ResponseError as e:
-            self.error(e.error_message)
+        if recurse:
+            for arg in self.args:
+                try:
+                    bucket = self.conn.get_bucket(arg)
+                    for key in bucket.list():
+                        bucket.delete_key(key.name)
+                    self.conn.delete_bucket(bucket)
+                except S3ResponseError as e:
+                    self.error(e.error_message)
+        else:
+            try:
+                bucket = self.conn.get_bucket(self.args[0])
+                if len(self.args) == 1:
+                    self.conn.delete_bucket(self.args[0])
+                else:
+                    for fn in self.args[1:]:
+                        bucket.delete_key(fn)
+            except S3ResponseError as e:
+                self.error(e.error_message)
 
 
 class MkCommand(Command):
