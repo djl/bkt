@@ -123,7 +123,7 @@ class GetCommand(Command):
             self.help()
 
         try:
-            bucket = self.conn.get_bucket(self.args[0])
+            bucket = self.conn.get_bucket(self.args[0], validate=False)
         except S3ResponseError as e:
             self.error(e.error_message)
 
@@ -155,7 +155,7 @@ class LsCommand(Command):
                 sys.stdout.write(b.name + '\n')
         else:
             try:
-                bucket = self.conn.get_bucket(self.args[0])
+                bucket = self.conn.get_bucket(self.args[0], validate=False)
                 for key in bucket.list():
                     sys.stdout.write(key.name + '\n')
             except S3ResponseError as e:
@@ -181,7 +181,7 @@ class RmCommand(Command):
         if recurse:
             for arg in self.args:
                 try:
-                    bucket = self.conn.get_bucket(arg)
+                    bucket = self.conn.get_bucket(arg, validate=False)
                     for key in bucket.list():
                         bucket.delete_key(key.name)
                     self.conn.delete_bucket(bucket)
@@ -189,7 +189,7 @@ class RmCommand(Command):
                     self.error(e.error_message)
         else:
             try:
-                bucket = self.conn.get_bucket(self.args[0])
+                bucket = self.conn.get_bucket(self.args[0], validate=False)
                 if len(self.args) == 1:
                     self.conn.delete_bucket(self.args[0])
                 else:
@@ -227,7 +227,7 @@ class PutCommand(Command):
             self.help()
 
         try:
-            bucket = self.conn.get_bucket(self.args[0])
+            bucket = self.conn.get_bucket(self.args[0], validate=False)
             for fn in self.args[1:]:
                 self._fn = os.path.basename(fn)
                 key = Key(bucket)
