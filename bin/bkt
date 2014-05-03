@@ -66,9 +66,6 @@ class Command(object):
         sys.stderr.write('%s\n' % self.__doc__.strip())
         sys.exit()
 
-    def parse_args(self):
-        self.options, self.args = self.parser.parse_args(sys.argv[2:])
-
     def progress(self, cur, total):
         if cur >= total:
             finished = True
