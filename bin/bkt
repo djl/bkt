@@ -27,6 +27,8 @@ from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
 
+PROGNAME = os.path.basename(sys.argv[0])
+
 HIDE_CURSOR = '\x1b[?25l'
 SHOW_CURSOR = '\x1b[?25h'
 
@@ -42,7 +44,7 @@ class Command(object):
         self.args = sys.argv[2:]
 
     def error(self, msg, error=1):
-        sys.stderr.write('bkt: %s%s\n' % (msg, SHOW_CURSOR))
+        sys.stderr.write('%s: %s%s\n' % (PROGNAME, msg, SHOW_CURSOR))
         sys.exit(error)
 
     def eval(self, cmd):
@@ -62,8 +64,9 @@ class Command(object):
                 continue
             return new_fn
 
-    def help(self, *args, **kwargs):
-        sys.stderr.write('%s\n' % self.__doc__.strip())
+    def help(self):
+        base = 'Usage: %s %s\n' % (PROGNAME, self.__doc__.strip())
+        sys.stderr.write(base)
         sys.exit()
 
     def progress(self, cur, total):
@@ -112,7 +115,7 @@ class Command(object):
 
 class GetCommand(Command):
     """
-    Usage: bkt get <bucket> <file> [...]
+    get <bucket> <file> [...]
     """
     name = 'get'
 
@@ -142,7 +145,7 @@ class GetCommand(Command):
 
 class LsCommand(Command):
     """
-    Usage: bkt ls [<bucket>]
+    ls [<bucket>]
     """
     name = 'ls'
 
@@ -164,7 +167,7 @@ class LsCommand(Command):
 
 class RmCommand(Command):
     """
-    Usage: bkt rm [-r] <bucket> [<file>, ...]
+    rm [-r] <bucket> [<file>, ...]
     """
     name = 'rm'
 
@@ -201,7 +204,7 @@ class RmCommand(Command):
 
 class MkCommand(Command):
     """
-    Usage: bkt mk <bucket> [...]
+    mk <bucket> [...]
     """
     name = 'mk'
 
@@ -218,7 +221,7 @@ class MkCommand(Command):
 
 class PutCommand(Command):
     """
-    Usage: bkt put <bucket> <file> [...]
+    put <bucket> <file> [...]
     """
     name = 'put'
 
