@@ -132,10 +132,11 @@ class GetCommand(Command):
 
         for fn in self.args[1:]:
             for name in fnmatch.filter(keys.keys(), fn):
+                basename = os.path.basename(name)
                 try:
                     key = keys[name]
-                    self._fn = name
-                    fn = self.get_local_filename(name)
+                    self._fn = basename
+                    fn = self.get_local_filename(basename)
                     fh = open(os.path.join(os.getcwd(), fn), 'w')
                     key.get_file(fh, cb=self.progress)
                     self._fn = None
