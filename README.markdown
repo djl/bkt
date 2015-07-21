@@ -58,8 +58,8 @@ Delete a bucket and its contents:
 SETUP
 -----
 
-Create an ini file `~/.bkt` and give it your access and secret
-keys in an `auth` section:
+Create an ini file in `~/.config/bkt/config.ini` and give it your
+access and secret keys in an `auth` section:
 
     [auth]
     access_key = 1234567890asdf

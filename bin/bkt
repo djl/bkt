@@ -29,13 +29,14 @@ from boto.s3.key import Key
 
 PROGNAME = os.path.basename(sys.argv[0])
 
+CONFIG_DIR = os.getenv('XDG_CONFIG_HOME', os.path.expanduser("~/.config"))
+CONFIG_FILE = os.path.join(CONFIG_DIR, PROGNAME, 'config.ini')
+
 HIDE_CURSOR = '\x1b[?25l'
 SHOW_CURSOR = '\x1b[?25h'
 
 
 class Command(object):
-
-    CONFIG_FILE = '~/.bkt'
 
     def __init__(self):
         self.setup_config()
@@ -105,7 +106,7 @@ class Command(object):
     def setup_config(self):
         try:
             self.config = configparser.ConfigParser()
-            self.config.readfp(open(os.path.expanduser(self.CONFIG_FILE)))
+            self.config.readfp(open(CONFIG_FILE))
         except IOError:
             self.error("Couldn't read your config file.")
 
