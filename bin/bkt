@@ -23,7 +23,7 @@ except ImportError:
     import ConfigParser as configparser
 
 from boto.exception import S3CreateError, S3ResponseError
-from boto.s3.connection import S3Connection
+from boto.s3.connection import S3Connection, OrdinaryCallingFormat
 from boto.s3.key import Key
 
 
@@ -111,7 +111,9 @@ class Command(object):
             self.error("Couldn't read your config file.")
 
     def setup_connection(self):
-        self.conn = S3Connection(self.access_key, self.secret_key)
+        self.conn = S3Connection(self.access_key,
+                                 self.secret_key,
+                                 calling_format=OrdinaryCallingFormat())
 
 
 class GetCommand(Command):
