@@ -33,12 +33,6 @@ Download a file to the current directory:
     $ bkt get BUCKET file.tar.gz
 
 
-Download all files to the current directory:
-
-    # uses globbing
-    $ bkt get BUCKET "*"
-
-
 Delete a file:
 
     $ bkt rm BUCKET file.tar.gz
@@ -81,4 +75,4 @@ GNOME Keyring you might do something like this:
 REQUIREMENTS
 ------------
 
-* [boto](https://pypi.python.org/pypi/boto)
+* [boto3](https://pypi.python.org/pypi/boto3)

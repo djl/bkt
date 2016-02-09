@@ -11,20 +11,20 @@ Commands:
   put            Upload a file to a bucket
   rm             Delete a bucket or files from a bucket
 """
-import fnmatch
 import os
 import shlex
 import subprocess
 import sys
+import threading
 
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
 
-from boto.exception import S3CreateError, S3ResponseError
-from boto.s3.connection import S3Connection, OrdinaryCallingFormat
-from boto.s3.key import Key
+
+import boto3
+import botocore
 
 
 PROGNAME = os.path.basename(sys.argv[0])
@@ -36,6 +36,54 @@ HIDE_CURSOR = '\x1b[?25l'
 SHOW_CURSOR = '\x1b[?25h'
 
 
+def echo(msg=''):
+    sys.stdout.write(msg + '\n')
+    sys.stdout.flush()
+
+
+def error(msg, error=1):
+    sys.stderr.write('%s: %s%s\n' % (PROGNAME, msg, SHOW_CURSOR))
+    sys.exit(error)
+
+
+def get_unique_filename(fn):
+    if not os.path.exists(fn):
+        return fn
+
+    count = 1
+    while True:
+        new_fn = '{}.{}'.format(fn, count)
+        if not os.path.exists(new_fn):
+            return new_fn
+        count += 1
+
+
+class Progress(object):
+    def __init__(self, filename, total=None):
+        self.filename = filename
+        self.basename = os.path.basename(filename)
+        if not total:
+            total = float(os.path.getsize(filename))
+        self.total = total
+        self.seen = 0
+        self.lock = threading.Lock()
+
+    def __call__(self, hunk):
+        finished = False
+        if self.seen >= self.total:
+            finished = True
+            self.seen = self.total
+
+        with self.lock:
+            self.seen += hunk
+            p = (self.seen / self.total) * 100
+            sys.stderr.write('%s\r%s: %d%%' % (HIDE_CURSOR, self.basename, p))
+            sys.stderr.flush()
+
+        if finished:
+            sys.stderr.write('%s\n' % SHOW_CURSOR)
+
+
 class Command(object):
 
     def __init__(self):
@@ -43,10 +91,6 @@ class Command(object):
         self.setup_auth()
         self.setup_connection()
         self.args = sys.argv[2:]
-
-    def error(self, msg, error=1):
-        sys.stderr.write('%s: %s%s\n' % (PROGNAME, msg, SHOW_CURSOR))
-        sys.exit(error)
 
     def eval(self, cmd):
         cmd = shlex.split(cmd)
@@ -101,19 +145,22 @@ class Command(object):
                 setattr(self, option, value)
 
             if getattr(self, option, None) is None:
-                self.error("Missing config option '%s'." % option)
+                error("Missing config option '%s'." % option)
 
     def setup_config(self):
         try:
             self.config = configparser.ConfigParser()
             self.config.readfp(open(CONFIG_FILE))
         except IOError:
-            self.error("Couldn't read your config file.")
+            error("Couldn't read your config file.")
 
     def setup_connection(self):
-        self.conn = S3Connection(self.access_key,
-                                 self.secret_key,
-                                 calling_format=OrdinaryCallingFormat())
+        session = boto3.Session(aws_access_key_id=self.access_key,
+                                aws_secret_access_key=self.secret_key)
+        self.conn = session.resource('s3')
+        self.client = boto3.client('s3',
+                                   aws_access_key_id=self.access_key,
+                                   aws_secret_access_key=self.secret_key)
 
 
 class GetCommand(Command):
@@ -126,25 +173,15 @@ class GetCommand(Command):
         if len(self.args) < 1:
             self.help()
 
-        try:
-            bucket = self.conn.get_bucket(self.args[0], validate=False)
-        except S3ResponseError as e:
-            self.error(e.error_message)
-
-        keys = dict([(key.name, key) for key in bucket.list()])
-
         for fn in self.args[1:]:
-            for name in fnmatch.filter(keys.keys(), fn):
-                basename = os.path.basename(name)
-                try:
-                    key = keys[name]
-                    self._fn = basename
-                    fn = self.get_local_filename(basename)
-                    fh = open(os.path.join(os.getcwd(), fn), 'w')
-                    key.get_file(fh, cb=self.progress)
-                    self._fn = None
-                except IOError:
-                    self.error("Could not write to local file '%s'" % fn)
+            try:
+                object = self.client.get_object(Bucket=self.args[0], Key=fn)
+                total = object['ContentLength']
+                dest = get_unique_filename(fn)
+                self.client.download_file(self.args[0], fn, dest,
+                                          Callback=Progress(fn, total=total))
+            except botocore.exceptions.ClientError as e:
+                error(e.response['Error']['Message'])
 
 
 class LsCommand(Command):
@@ -156,17 +193,17 @@ class LsCommand(Command):
     def run(self):
         # listing all buckets
         if len(self.args) == 0:
-            for b in self.conn.get_all_buckets():
-                sys.stdout.write(b.name + '\n')
+            for b in self.conn.buckets.all():
+                echo(b.name)
             return
 
         # list contents of a bucket
         try:
-            bucket = self.conn.get_bucket(self.args[0], validate=False)
-            for key in bucket.list():
-                sys.stdout.write(key.name + '\n')
-        except S3ResponseError as e:
-            self.error(e.error_message)
+            bucket = self.conn.Bucket(self.args[0])
+            for key in bucket.objects.all():
+                echo(key.key)
+        except botocore.exceptions.ClientError as e:
+            error(e.response['Error']['Message'])
 
 
 class RmCommand(Command):
@@ -176,7 +213,7 @@ class RmCommand(Command):
     name = 'rm'
 
     def run(self):
-        if self.args[0] in ['-r', '--recurse']:
+        if self.args[0] == '-r':
             recurse = True
             del self.args[0]
         else:
@@ -188,22 +225,23 @@ class RmCommand(Command):
         if recurse:
             for arg in self.args:
                 try:
-                    bucket = self.conn.get_bucket(arg, validate=False)
-                    for key in bucket.list():
-                        bucket.delete_key(key.name)
-                    self.conn.delete_bucket(bucket)
-                except S3ResponseError as e:
-                    self.error(e.error_message)
+                    bucket = self.conn.Bucket(self.args[0])
+                    for key in bucket.objects.all():
+                        key.delete()
+                    bucket.delete()
+                except botocore.exceptions.ClientError as e:
+                    error(e.response['Error']['Message'])
         else:
             try:
-                bucket = self.conn.get_bucket(self.args[0], validate=False)
+                bucket = self.conn.Bucket(self.args[0])
                 if len(self.args) == 1:
-                    self.conn.delete_bucket(self.args[0])
+                    bucket.delete()
                 else:
                     for fn in self.args[1:]:
-                        bucket.delete_key(fn)
-            except S3ResponseError as e:
-                self.error(e.error_message)
+                        obj = self.conn.Object(self.args[0], fn)
+                        obj.delete()
+            except botocore.exceptions.ClientError as e:
+                error(e.response['Error']['Message'])
 
 
 class MkCommand(Command):
@@ -218,9 +256,9 @@ class MkCommand(Command):
 
         for bucket in self.args:
             try:
-                self.conn.create_bucket(bucket)
-            except (S3CreateError, S3ResponseError) as e:
-                self.error(e.error_message)
+                self.conn.create_bucket(Bucket=bucket)
+            except botocore.exceptions.ClientError as e:
+                error(e.response['Error']['Message'])
 
 
 class PutCommand(Command):
@@ -233,16 +271,13 @@ class PutCommand(Command):
         if len(self.args) < 2:
             self.help()
 
-        try:
-            bucket = self.conn.get_bucket(self.args[0], validate=False)
-            for fn in self.args[1:]:
-                self._fn = os.path.basename(fn)
-                k = Key(bucket)
-                k.name = os.path.basename(fn)
-                k.set_contents_from_filename(fn, cb=self.progress, num_cb=100)
-                self._fn = None
-        except S3ResponseError as e:
-            self.error(e.error_message)
+        for fn in self.args[1:]:
+            try:
+                key = os.path.basename(fn)
+                self.client.upload_file(fn, self.args[0], key,
+                                        Callback=Progress(fn))
+            except botocore.exceptions.ClientError as e:
+                error(e.response['Error']['Message'])
 
 
 def main():
